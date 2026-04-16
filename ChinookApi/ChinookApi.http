@@ -1,0 +1,6 @@
+@ChinookApi_HostAddress = http://localhost:5262
+
+GET {{ChinookApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
