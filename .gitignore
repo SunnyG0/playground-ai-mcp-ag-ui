@@ -2,3 +2,8 @@ ChinookApi/bin/
 ChinookApi/obj/
 chinook-client/node_modules/
 chinook-client/dist/
+/ChinookApi/.vs/ChinookApi/v18/DocumentLayout.json
+/ChinookApi/.vs/ChinookApi/v18/.suo
+/ChinookApi/.vs/ChinookApi/FileContentIndex/4fabf5d6-c10a-473c-8058-b95d28847977.vsidx
+/ChinookApi/.vs/ChinookApi/DesignTimeBuild/.dtbcache.v2
+/ChinookApi/.vs/ChinookApi/config/applicationhost.config
