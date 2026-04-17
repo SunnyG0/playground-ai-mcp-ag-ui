@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ChinookApi.Data;
+using ChinookApi.Mcp;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,9 +24,19 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader());
 });
 
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithTools<SearchMusicTool>()
+    .WithTools<ArtistCatalogTool>()
+    .WithTools<AlbumDetailsTool>()
+    .WithTools<PlaylistTool>()
+    .WithTools<CustomerHistoryTool>()
+    .WithTools<GenreExplorerTool>();
+
 var app = builder.Build();
 
 app.UseCors();
 app.MapControllers();
+app.MapMcp("/mcp");
 
 app.Run();
