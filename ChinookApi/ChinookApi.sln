@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.5.11626.173 insiders
+VisualStudioVersion = 18.6.11709.129 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChinookApi", "ChinookApi.csproj", "{274DBDC2-F49A-61A0-C22D-9434108EE67B}"
 EndProject
@@ -20,6 +20,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {418D0434-7244-4C46-B076-9688DF80D930}
+		SolutionGuid = {6FA22451-55D0-417F-8F28-EBCD29BD605D}
 	EndGlobalSection
 EndGlobal
