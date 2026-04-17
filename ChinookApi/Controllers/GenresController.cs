@@ -1,17 +1,14 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ChinookApi.Data;
+using ChinookApi.Features.Genres;
 
 namespace ChinookApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class GenresController : ControllerBase
+public class GenresController(IMediator mediator) : ControllerBase
 {
-    private readonly ChinookContext _db;
-    public GenresController(ChinookContext db) => _db = db;
-
     [HttpGet]
     public async Task<IActionResult> GetAll() =>
-        Ok(await _db.Genres.OrderBy(g => g.Name).ToListAsync());
+        Ok(await mediator.Send(new GetAllGenresQuery()));
 }

@@ -1,24 +1,21 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ChinookApi.Data;
+using ChinookApi.Features.Playlists;
 
 namespace ChinookApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class PlaylistsController : ControllerBase
+public class PlaylistsController(IMediator mediator) : ControllerBase
 {
-    private readonly ChinookContext _db;
-    public PlaylistsController(ChinookContext db) => _db = db;
-
     [HttpGet]
     public async Task<IActionResult> GetAll() =>
-        Ok(await _db.Playlists.OrderBy(p => p.Name).ToListAsync());
+        Ok(await mediator.Send(new GetAllPlaylistsQuery()));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var playlist = await _db.Playlists.Include(p => p.Tracks).ThenInclude(t => t.Album).FirstOrDefaultAsync(p => p.PlaylistId == id);
+        var playlist = await mediator.Send(new GetPlaylistByIdQuery(id));
         if (playlist == null) return NotFound();
         return Ok(playlist);
     }
