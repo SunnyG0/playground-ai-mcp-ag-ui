@@ -1,31 +1,21 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ChinookApi.Data;
+using ChinookApi.Features.Customers;
 
 namespace ChinookApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class CustomersController : ControllerBase
+public class CustomersController(IMediator mediator) : ControllerBase
 {
-    private readonly ChinookContext _db;
-    public CustomersController(ChinookContext db) => _db = db;
-
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
-    {
-        var query = _db.Customers.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(c => EF.Functions.Like(c.FirstName + " " + c.LastName, $"%{search}%") || EF.Functions.Like(c.Email, $"%{search}%"));
-        var total = await query.CountAsync();
-        var items = await query.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-        return Ok(new { total, page, pageSize, items });
-    }
+    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20) =>
+        Ok(await mediator.Send(new GetAllCustomersQuery(search, page, pageSize)));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var customer = await _db.Customers.FindAsync(id);
+        var customer = await mediator.Send(new GetCustomerByIdQuery(id));
         if (customer == null) return NotFound();
         return Ok(customer);
     }
