@@ -2,3 +2,5 @@ ChinookApi/bin/
 ChinookApi/obj/
 chinook-client/node_modules/
 chinook-client/dist/
+/ChinookApi/.vs
+/ChinookApi/ChinookApi.csproj.user
