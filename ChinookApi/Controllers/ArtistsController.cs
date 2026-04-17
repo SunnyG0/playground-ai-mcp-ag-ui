@@ -17,7 +17,7 @@ public class ArtistsController : ControllerBase
     {
         var query = _db.Artists.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(a => a.Name != null && a.Name.Contains(search));
+            query = query.Where(a => a.Name != null && EF.Functions.Like(a.Name, $"%{search}%"));
         var total = await query.CountAsync();
         var items = await query.OrderBy(a => a.Name).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
         return Ok(new { total, page, pageSize, items });

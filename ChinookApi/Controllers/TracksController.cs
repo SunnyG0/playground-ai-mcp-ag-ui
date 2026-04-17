@@ -16,7 +16,7 @@ public class TracksController : ControllerBase
     {
         var query = _db.Tracks.Include(t => t.Album).Include(t => t.Genre).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(t => t.Name.Contains(search));
+            query = query.Where(t => EF.Functions.Like(t.Name, $"%{search}%"));
         if (genreId.HasValue)
             query = query.Where(t => t.GenreId == genreId);
         var total = await query.CountAsync();

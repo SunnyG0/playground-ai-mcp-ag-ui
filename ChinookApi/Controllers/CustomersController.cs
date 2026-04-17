@@ -16,7 +16,7 @@ public class CustomersController : ControllerBase
     {
         var query = _db.Customers.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(c => (c.FirstName + " " + c.LastName).Contains(search) || c.Email.Contains(search));
+            query = query.Where(c => EF.Functions.Like(c.FirstName + " " + c.LastName, $"%{search}%") || EF.Functions.Like(c.Email, $"%{search}%"));
         var total = await query.CountAsync();
         var items = await query.OrderBy(c => c.LastName).ThenBy(c => c.FirstName).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
         return Ok(new { total, page, pageSize, items });
