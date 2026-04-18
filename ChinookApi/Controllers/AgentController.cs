@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using ChinookApi.Agent;
+using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
@@ -10,15 +11,10 @@ namespace ChinookApi.Controllers;
 
 [ApiController]
 public class AgentController(
-    IChatClient chatClient,
+    AIAgent agent,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration) : ControllerBase
 {
-    private const string SystemPrompt =
-        "You are a helpful music catalog assistant for the Chinook database. " +
-        "You can search for artists, albums, tracks, playlists, genres, and customer purchase history. " +
-        "Use the available tools to look up information and provide clear, concise answers.";
-
     [HttpPost("/agent")]
     public async Task RunAgentAsync([FromBody] RunAgentInput input, CancellationToken cancellationToken)
     {
@@ -26,10 +22,10 @@ public class AgentController(
         Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["X-Accel-Buffering"] = "no";
 
-        var threadId = input.ThreadId ?? Guid.NewGuid().ToString();
-        var runId = input.RunId ?? Guid.NewGuid().ToString();
+        var threadId = string.IsNullOrWhiteSpace(input.ThreadId) ? Guid.NewGuid().ToString("N") : input.ThreadId;
+        var runId = string.IsNullOrWhiteSpace(input.RunId) ? Guid.NewGuid().ToString("N") : input.RunId;
 
-        await WriteEventAsync(new { type = "RUN_STARTED", thread_id = threadId, run_id = runId }, cancellationToken);
+        await WriteEventAsync(new { type = "RUN_STARTED", threadId, runId }, cancellationToken);
 
         try
         {
@@ -46,82 +42,83 @@ public class AgentController(
 
             var messages = BuildMessages(input.Messages);
 
-            var options = new ChatOptions { Tools = [.. mcpTools] };
-
-            while (true)
+            var runOptions = new ChatClientAgentRunOptions
             {
-                var currentMessageId = Guid.NewGuid().ToString();
-                var textStarted = false;
-                var toolCallMap = new Dictionary<string, FunctionCallContent>();
-                var allContents = new List<AIContent>();
+                ChatOptions = new ChatOptions { Tools = [.. mcpTools] }
+            };
 
-                await foreach (var update in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken))
+            var session = await agent.CreateSessionAsync(cancellationToken);
+
+            string? currentMessageId = null;
+
+            await foreach (var update in agent.RunStreamingAsync(messages, session, runOptions, cancellationToken)
+                                              .AsChatResponseUpdatesAsync())
+            {
+                // Assign a fallback message ID when the provider doesn't supply one
+                if (string.IsNullOrWhiteSpace(update.MessageId))
+                    update.MessageId = currentMessageId ?? Guid.NewGuid().ToString("N");
+
+                foreach (var content in update.Contents)
                 {
-                    foreach (var content in update.Contents)
+                    if (content is TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
                     {
-                        allContents.Add(content);
-
-                        if (content is TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
+                        if (!string.Equals(currentMessageId, update.MessageId, StringComparison.Ordinal))
                         {
-                            if (!textStarted)
+                            if (currentMessageId is not null)
                             {
                                 await WriteEventAsync(
-                                    new { type = "TEXT_MESSAGE_START", message_id = currentMessageId, role = "assistant" },
+                                    new { type = "TEXT_MESSAGE_END", messageId = currentMessageId },
                                     cancellationToken);
-                                textStarted = true;
                             }
 
+                            currentMessageId = update.MessageId;
+                            var role = update.Role?.Value ?? "assistant";
                             await WriteEventAsync(
-                                new { type = "TEXT_MESSAGE_CONTENT", message_id = currentMessageId, delta = textContent.Text },
+                                new { type = "TEXT_MESSAGE_START", messageId = currentMessageId, role },
                                 cancellationToken);
                         }
-                        else if (content is FunctionCallContent functionCall && functionCall.CallId is not null)
+
+                        await WriteEventAsync(
+                            new { type = "TEXT_MESSAGE_CONTENT", messageId = currentMessageId, delta = textContent.Text },
+                            cancellationToken);
+                    }
+                    else if (content is FunctionCallContent functionCall && functionCall.CallId is not null)
+                    {
+                        var argsJson = functionCall.Arguments is not null
+                            ? JsonSerializer.Serialize(functionCall.Arguments)
+                            : "{}";
+
+                        await WriteEventAsync(
+                            new { type = "TOOL_CALL_START", toolCallId = functionCall.CallId, toolCallName = functionCall.Name, parentMessageId = update.MessageId },
+                            cancellationToken);
+                        await WriteEventAsync(
+                            new { type = "TOOL_CALL_ARGS", toolCallId = functionCall.CallId, delta = argsJson },
+                            cancellationToken);
+                        await WriteEventAsync(
+                            new { type = "TOOL_CALL_END", toolCallId = functionCall.CallId },
+                            cancellationToken);
+                    }
+                    else if (content is FunctionResultContent functionResult)
+                    {
+                        var resultText = functionResult.Result switch
                         {
-                            toolCallMap[functionCall.CallId] = functionCall;
-                        }
+                            string s => s,
+                            null => "",
+                            var r => JsonSerializer.Serialize(r)
+                        };
+
+                        await WriteEventAsync(
+                            new { type = "TOOL_CALL_RESULT", messageId = update.MessageId, toolCallId = functionResult.CallId, content = resultText, role = "tool" },
+                            cancellationToken);
                     }
                 }
+            }
 
-                if (textStarted)
-                {
-                    await WriteEventAsync(
-                        new { type = "TEXT_MESSAGE_END", message_id = currentMessageId },
-                        cancellationToken);
-                }
-
-                messages.Add(new ChatMessage(ChatRole.Assistant, allContents));
-
-                if (toolCallMap.Count == 0)
-                    break;
-
-                foreach (var (callId, toolCall) in toolCallMap)
-                {
-                    var argsJson = toolCall.Arguments is not null
-                        ? JsonSerializer.Serialize(toolCall.Arguments)
-                        : "{}";
-
-                    await WriteEventAsync(
-                        new { type = "TOOL_CALL_START", tool_call_id = callId, tool_call_message_id = currentMessageId, tool_name = toolCall.Name },
-                        cancellationToken);
-                    await WriteEventAsync(
-                        new { type = "TOOL_CALL_ARGS_DELTA", tool_call_id = callId, delta = argsJson },
-                        cancellationToken);
-                    await WriteEventAsync(
-                        new { type = "TOOL_CALL_END", tool_call_id = callId },
-                        cancellationToken);
-
-                    var callResult = await mcpClient.CallToolAsync(
-                        toolCall.Name,
-                        toolCall.Arguments?.ToDictionary(k => k.Key, v => v.Value),
-                        cancellationToken: cancellationToken);
-
-                    var resultText = string.Join("\n", callResult.Content
-                        .OfType<TextContentBlock>()
-                        .Select(c => c.Text));
-
-                    messages.Add(new ChatMessage(ChatRole.Tool,
-                        [new FunctionResultContent(callId, resultText)]));
-                }
+            if (currentMessageId is not null)
+            {
+                await WriteEventAsync(
+                    new { type = "TEXT_MESSAGE_END", messageId = currentMessageId },
+                    cancellationToken);
             }
         }
         catch (Exception ex)
@@ -132,17 +129,12 @@ public class AgentController(
             return;
         }
 
-        await WriteEventAsync(
-            new { type = "RUN_FINISHED", thread_id = threadId, run_id = runId },
-            cancellationToken);
+        await WriteEventAsync(new { type = "RUN_FINISHED", threadId, runId }, cancellationToken);
     }
 
     private static List<ChatMessage> BuildMessages(List<AgentMessage> agentMessages)
     {
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System, SystemPrompt)
-        };
+        var messages = new List<ChatMessage>();
 
         foreach (var msg in agentMessages)
         {
