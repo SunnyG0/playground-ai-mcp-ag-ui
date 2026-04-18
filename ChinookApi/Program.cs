@@ -2,9 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using ChinookApi.Data;
 using ChinookApi.Mcp;
 using System.Text.Json.Serialization;
-using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using OpenAI;
-using OpenAI.Chat;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,16 +40,8 @@ var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? string.Empty;
 var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
 
-builder.Services.AddSingleton<AIAgent>(_ =>
-{
-    ChatClient chatClient = new OpenAIClient(openAiApiKey).GetChatClient(openAiModel);
-    return chatClient.AsAIAgent(
-        name: "ChinookAssistant",
-        instructions:
-            "You are a helpful music catalog assistant for the Chinook database. " +
-            "You can search for artists, albums, tracks, playlists, genres, and customer purchase history. " +
-            "Use the available tools to look up information and provide clear, concise answers.");
-});
+builder.Services.AddSingleton<IChatClient>(_ =>
+    new OpenAIClient(openAiApiKey).GetChatClient(openAiModel).AsIChatClient());
 
 builder.Services.AddHttpClient("mcp");
 

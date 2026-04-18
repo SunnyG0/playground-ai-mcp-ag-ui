@@ -5,7 +5,6 @@ import Tracks from './pages/Tracks';
 import Playlists from './pages/Playlists';
 import Customers from './pages/Customers';
 import Invoices from './pages/Invoices';
-import Agent from './pages/Agent';
 import './App.css';
 
 export default function App() {
@@ -21,7 +20,6 @@ export default function App() {
             <NavLink to="/playlists" className={({ isActive }) => isActive ? 'active' : ''}>Playlists</NavLink>
             <NavLink to="/customers" className={({ isActive }) => isActive ? 'active' : ''}>Customers</NavLink>
             <NavLink to="/invoices" className={({ isActive }) => isActive ? 'active' : ''}>Invoices</NavLink>
-            <NavLink to="/agent" className={({ isActive }) => isActive ? 'active' : ''}>🤖 Agent</NavLink>
           </div>
         </nav>
         <main className="main-content">
@@ -32,7 +30,6 @@ export default function App() {
             <Route path="/playlists" element={<Playlists />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/invoices" element={<Invoices />} />
-            <Route path="/agent" element={<Agent />} />
           </Routes>
         </main>
       </div>
