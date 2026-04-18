@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ChinookApi.Data;
 using ChinookApi.Mcp;
+using ChinookApi.AgUI;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,9 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
+
+// Register the Chinook AI agent factory used by the AG-UI endpoint
+builder.Services.AddScoped<ChinookAgentFactory>();
 
 builder.Services.AddMcpServer()
     .WithHttpTransport()
